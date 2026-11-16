@@ -22,6 +22,10 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Configure Git line endings
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
       - uses: actions/checkout@v7
         with:
           ref: 396db08f2920d54e1d0465d5b2d0d9f26f1532a7
@@ -69,7 +73,8 @@ jobs:
       - name: Check formatting and vet logger
         run: |
           set -euo pipefail
-          test -z "$(gofmt -l doc.go internal/debug/*.go internal/atlas/image.go internal/graphicscommand/image.go internal/graphicscommand/commandqueue.go internal/ui/context.go)"
+          files=$(gofmt -l doc.go internal/debug/*.go internal/atlas/image.go internal/graphicscommand/image.go internal/graphicscommand/commandqueue.go internal/ui/context.go)
+          if [ -n "$files" ]; then echo "$files"; exit 1; fi
           go vet ./internal/debug
           go vet -tags=ebitenginedebug ./internal/debug
           go vet -tags=ebitendebug ./internal/debug
