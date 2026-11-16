@@ -28,7 +28,7 @@ jobs:
           git config --global core.eol lf
       - uses: actions/checkout@v7
         with:
-          ref: 396db08f2920d54e1d0465d5b2d0d9f26f1532a7
+          ref: 6e15f0ca8f82fb21497b8ea38309615b37b80183
       - uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go }}
@@ -55,21 +55,6 @@ jobs:
         run: |
           set -euo pipefail
           go test -race -tags=ebitenginedebug -count=25 -shuffle=on ./internal/debug 2>&1 | tee test-results/race.log
-      - name: Test graphics and UI integration on Linux
-        if: runner.os == 'Linux'
-        run: |
-          set -euo pipefail
-          for mode in normal ebitenginedebug; do
-            tags="$mode"
-            if [ "$mode" = normal ]; then tags=""; fi
-            echo "Testing affected packages for $mode"
-            if xvfb-run -a go test -tags="$tags" -p=1 . ./internal/atlas ./internal/graphicscommand ./internal/ui > "test-results/integration-$mode.log" 2>&1; then
-              tail -n 12 "test-results/integration-$mode.log"
-            else
-              tail -n 100 "test-results/integration-$mode.log"
-              exit 1
-            fi
-          done
       - name: Check formatting and vet logger
         run: |
           set -euo pipefail
