@@ -1,0 +1,81 @@
+name: Verify slog 2909
+
+on:
+  push:
+    branches: [verify/issue-2909-slog]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            go: '1.26.x'
+          - os: windows-latest
+            go: '1.27.x'
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 396db08f
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Install Linux graphics dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1 libgl1-mesa-dri libx11-6 libxcursor1 libxext6 libxi6 libxinerama1 libxrandr2 libxrender1
+      - name: Build and test normal and debug variants
+        run: |
+          set -euo pipefail
+          mkdir -p test-results
+          go version | tee test-results/environment.txt
+          for mode in normal ebitenginedebug ebitendebug; do
+            tags="$mode"
+            if [ "$mode" = normal ]; then tags=""; fi
+            echo "::group::$mode"
+            go test -tags="$tags" -v ./internal/debug 2>&1 | tee "test-results/unit-$mode.log"
+            go build -tags="$tags" ./... ./skills/run-ebitengine-app-headless/_driver 2>&1 | tee "test-results/build-$mode.log"
+            echo "Build passed for $mode"
+            echo "::endgroup::"
+          done
+      - name: Race test buffered logging
+        run: |
+          set -euo pipefail
+          go test -race -tags=ebitenginedebug -count=25 -shuffle=on ./internal/debug 2>&1 | tee test-results/race.log
+      - name: Test graphics and UI integration on Linux
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          for mode in normal ebitenginedebug; do
+            tags="$mode"
+            if [ "$mode" = normal ]; then tags=""; fi
+            echo "Testing affected packages for $mode"
+            if xvfb-run -a go test -tags="$tags" -p=1 . ./internal/atlas ./internal/graphicscommand ./internal/ui > "test-results/integration-$mode.log" 2>&1; then
+              tail -n 12 "test-results/integration-$mode.log"
+            else
+              tail -n 100 "test-results/integration-$mode.log"
+              exit 1
+            fi
+          done
+      - name: Check formatting and vet logger
+        run: |
+          set -euo pipefail
+          test -z "$(gofmt -l doc.go internal/debug/*.go internal/atlas/image.go internal/graphicscommand/image.go internal/graphicscommand/commandqueue.go internal/ui/context.go)"
+          go vet ./internal/debug
+          go vet -tags=ebitenginedebug ./internal/debug
+          go vet -tags=ebitendebug ./internal/debug
+      - name: Upload verification results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slog-2909-${{ runner.os }}
+          path: test-results/
