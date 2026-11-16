@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: 396db08f
+          ref: 396db08f2920d54e1d0465d5b2d0d9f26f1532a7
       - uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go }}
